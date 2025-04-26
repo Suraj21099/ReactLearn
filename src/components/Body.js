@@ -1,14 +1,16 @@
 import RestaurantCard, { withPromtedLabel } from "./RestaurantCard";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useCallback } from "react";
 import Shimmer from "./Shimmer";
 import { Link } from "react-router-dom";
 import useOnlineStatus from "../utils/useOnlineStatus";
 import UserContext from "../utils/UserContext";
+import { debounce } from "../utils/useOnlineStatus";
 
 const Body = () => {
   // Local State Variable - Super powerful variable
   const [listOfRestaurants, setListOfRestraunt] = useState([]);
   const [filteredRestaurant, setFilteredRestaurant] = useState([]);
+  const [inputValue, setInputValue] = useState("");
 
   const [searchText, setSearchText] = useState("");
 
@@ -23,13 +25,14 @@ const Body = () => {
   const fetchData = async () => {
     const data = await fetch(
       "https://www.swiggy.com/dapi/restaurants/list/v5?lat=12.9351929&lng=77.62448069999999&page_type=DESKTOP_WEB_LISTING"
+      // "https://www.swiggy.com/mapi/restaurants/list/v5?lat=28.5359459&lng=77.2998095&carousel=true&third_party_vendor=1"
     );
 
     const json = await data.json();
 
     // Optional Chaining
-    setListOfRestraunt(json?.data?.cards[2]?.data?.data?.cards);
-    setFilteredRestaurant(json?.data?.cards[2]?.data?.data?.cards);
+    setListOfRestraunt(json?.data?.cards[4]?.card?.card?.gridElements?.infoWithStyle?.restaurants);
+    setFilteredRestaurant(json?.data?.cards[4]?.card?.card?.gridElements?.infoWithStyle?.restaurants);
   };
 
   const onlineStatus = useOnlineStatus();
@@ -42,6 +45,16 @@ const Body = () => {
     );
 
   const { loggedInUser, setUserName } = useContext(UserContext);
+  const debouncedSetUserName = useCallback(
+    debounce((val) => setUserName(val), 1000),
+    []
+  );
+  const handleChange = (e) => {
+    const value = e.target.value;
+    setInputValue(value);          // immediate typing feedback
+    debouncedSetUserName(value);  // delayed state update
+  };
+
 
   return listOfRestaurants.length === 0 ? (
     <Shimmer />
@@ -65,7 +78,7 @@ const Body = () => {
               console.log(searchText);
 
               const filteredRestaurant = listOfRestaurants.filter((res) =>
-                res.data.name.toLowerCase().includes(searchText.toLowerCase())
+                res.info.name.toLowerCase().includes(searchText.toLowerCase())
               );
 
               setFilteredRestaurant(filteredRestaurant);
@@ -91,18 +104,18 @@ const Body = () => {
           <label>UserName : </label>
           <input
             className="border border-black p-2"
-            value={loggedInUser}
-            onChange={(e) => setUserName(e.target.value)}
+            value={inputValue}
+            onChange={handleChange}
           />
         </div>
       </div>
       <div className="flex flex-wrap">
         {filteredRestaurant.map((restaurant) => (
           <Link
-            key={restaurant.data.id}
-            to={"/restaurants/" + restaurant.data.id}
+            key={restaurant.info.id}
+            to={"/restaurants/" + restaurant.info.id}
           >
-            {restaurant.data.promoted ? (
+            {restaurant.info.promoted ? (
               <RestaurantCardPromoted resData={restaurant} />
             ) : (
               <RestaurantCard resData={restaurant} />
